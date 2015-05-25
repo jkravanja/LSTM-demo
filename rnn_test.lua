@@ -4,7 +4,7 @@ LSTMSize=25
 outputSize=5
 nSteps=3 --sequence length
 batchSize=1
-lr=0.5
+lr=0.5 --learning rate
 -- test with LSTM
 local lstm = nn.LSTM(inputSize, LSTMSize,2*nSteps)
 local L=nn.Sequential()
@@ -27,18 +27,15 @@ for step=1,2*nSteps do
 		targets[step][targets[step]:gt(0.5)]=1
 		targets[step][targets[step]:lt(0.5)]=0
 	end
-
 end
 
 --train
-
 for iter=1,2000 do
 	lstm:forget()
 	ld={}
 	L:zeroGradParameters()
 	lstm:zeroGradParameters()
-	--outputsL={}
-	--outputs={}
+
 	e=0
 	--unfold through time - forward and backward
 	for step=1,2*nSteps do
@@ -48,8 +45,8 @@ for iter=1,2000 do
 		outputs[step]= L:forward(outputsL[step]):clone() 
 		
 		if(step>nSteps) then
-		e=e+MSE:forward(outputs[step],targets[step])
-		ld[step]=MSE:backward(outputs[step],targets[step])
+			e=e+MSE:forward(outputs[step],targets[step])
+			ld[step]=MSE:backward(outputs[step],targets[step])
 		end
 
 		local dL
@@ -61,45 +58,31 @@ for iter=1,2000 do
 			dL=torch.Tensor(batchSize,LSTMSize):zero() 
 
 		end
-		--print(dL)
+		
+		--truncate gradient
 		dL[dL:gt(5)]=5
 		dL[dL:lt(-5)]=-5
 
-
-		--print('dl',dL)
 		lstm:backward(inputs[step], dL)
 	end	
 	e=e/nSteps
-
-	--if(iter>200) then iter=iter/5; end
 
 	L:updateParameters(lr)	
 	lstm:backwardThroughTime()
 
 	--truncate gradient, prevent gradient exploding
 	for c=1,#lstm.gradCells do
-	lstm.gradCells[c][lstm.gradCells[c]:gt(5)]=5
- 	lstm.gradCells[c][lstm.gradCells[c]:lt(-5)]=-5
-	--lstm.gradCells[c]:div(lstm.gradCells[c]:norm())
+		lstm.gradCells[c][lstm.gradCells[c]:gt(5)]=5
+	 	lstm.gradCells[c][lstm.gradCells[c]:lt(-5)]=-5
+		--lstm.gradCells[c]:div(lstm.gradCells[c]:norm())
 	end
 	for c=1,#lstm.gradOutputs do
-
-	lstm.gradOutputs[c][lstm.gradOutputs[c]:gt(5)]=5
- 	lstm.gradOutputs[c][lstm.gradOutputs[c]:lt(-5)]=-5
-	--lstm.gradOutputs[c]:div(lstm.gradOutputs[c]:norm())
+		lstm.gradOutputs[c][lstm.gradOutputs[c]:gt(5)]=5
+	 	lstm.gradOutputs[c][lstm.gradOutputs[c]:lt(-5)]=-5
+		--lstm.gradOutputs[c]:div(lstm.gradOutputs[c]:norm())
 	end
-	--for c=1,#lstm.gradInput do
-	--lstm.gradInput[c][lstm.gradInput[c]:gt(1)]=1
- 	--lstm.gradInput[c][lstm.gradInput[c]:lt(-1)]=-1
-	--end
--- 	lstm.gradOutputs[lstm.gradOutputs:gt(1)]=1
--- 	lstm.gradOutputs[lstm.gradOutputs:lt(-1)]=-1
--- 	lstm.gradInput[lstm.gradInput:gt(1)]=1
--- 	lstm.gradInput[lstm.gradInput:lt(-1)]=-1
 
-	--print('-----gradOutput, gradCels[2]-----')
-	--print(lstm.gradOutputs[5])
-	--print(lstm.gradCells[2])
+	--print some outputs and targets during training
 	print('-----outputs, targets-----')	
 	print(outputs[5])
 	print(targets[5])
